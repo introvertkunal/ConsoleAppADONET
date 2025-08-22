@@ -1,46 +1,76 @@
-﻿using ClassLibrary;
+using ClassLibrary;
 using Microsoft.Data.SqlClient;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Runtime.ConstrainedExecution;
-using System.Security.Cryptography.X509Certificates;
-
-
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 class Program
 {
     static void Main(string[] args)
     {
-
         Type type = typeof(Subject);
 
-        var tableAttribute = type.GetCustomAttributes(typeof(TableAttribute), false).FirstOrDefault() as TableAttribute;
+        // Get SqlTable attribute instead of [Table]
+        var tableAttribute = type.GetCustomAttributes(typeof(SqlTableAttribute), false).FirstOrDefault() as SqlTableAttribute;
 
-        string tableName = tableAttribute.Name;
+        if (tableAttribute == null)
+        {
+            Console.WriteLine("No SqlTable attribute found.");
+            return;
+        }
 
-        string createTable = $"Create Table {tableName}(";
+        string tableName = tableAttribute.TableName;
+        string createTable = $"CREATE TABLE {tableName} (";
+
+        List<string> indexQueries = new List<string>();
 
         foreach (var prop in type.GetProperties())
         {
-            var columnAttribute = prop.GetCustomAttributes(typeof(ColumnAttribute), false).FirstOrDefault() as ColumnAttribute;
+            var columnAttribute = prop.GetCustomAttributes(typeof(SqlColumnAttribute), false).FirstOrDefault() as SqlColumnAttribute;
+
             if (columnAttribute != null)
             {
-                Console.WriteLine($"Column Name: {prop.Name}, Type: {columnAttribute.Name}");
+                string columnName = prop.Name;
+                string sqlType = columnAttribute.SqlType;
 
-                createTable += $" {prop.Name} {columnAttribute.Name},";
+                string constraints = "";
 
+                if (columnAttribute.ISPrimaryKey)
+                    constraints += " PRIMARY KEY";
+
+                if (columnAttribute.IsAutoIncremented)
+                    constraints += " IDENTITY(1,1)";
+
+                if (!columnAttribute.ISNullable)
+                    constraints += " NOT NULL";
+
+                createTable += $" {columnName} {sqlType}{constraints},";
+
+                // Handle index
+                if (columnAttribute.IsIndexed)
+                {
+                    string indexQuery = $"CREATE INDEX IDX_{tableName}_{columnName} ON {tableName}({columnName});";
+                    indexQueries.Add(indexQuery);
+                }
             }
             else
             {
-                Console.WriteLine($"Property: {prop.Name}, No Column Attribute");
+                Console.WriteLine($"Property: {prop.Name}, No SqlColumn attribute found");
             }
         }
 
-        string finalQuery = createTable.TrimEnd(',',' ') + ")";
+        string finalQuery = createTable.TrimEnd(',') + ")";
 
+        Console.WriteLine("Generated CREATE TABLE:");
         Console.WriteLine(finalQuery);
 
-        string connectionString = @$"Server=;Database= simpleDatabase;Trusted_Connection=True;TrustServerCertificate=True";
+        foreach (var q in indexQueries)
+        {
+            Console.WriteLine("Generated INDEX:");
+            Console.WriteLine(q);
+        }
+
+        string connectionString = @"Server=localhost;Database=simpleDatabase;Trusted_Connection=True;TrustServerCertificate=True";
 
         using SqlConnection conn = new SqlConnection(connectionString);
 
@@ -48,28 +78,24 @@ class Program
         {
             conn.Open();
 
-            //string insertQuery = "insert into Subject values(1,'OS','interface between user and computer hardware','465h')";
+            // Execute CREATE TABLE
+            using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+            {
+                cmd.ExecuteNonQuery();
+                Console.WriteLine("✅ Table created successfully.");
+            }
 
-            //string selectQuery = "select * from Subject";
-
-            //SqlDataReader reader = cmd.ExecuteReader();
-
-            //while( reader.Read() )
-            //{
-            //    Console.WriteLine($"{reader["Id"]}  {reader["Name"]} {reader["Description"]} {reader["Code"]} "); 
-            //}
-
-            using SqlCommand cmd = new SqlCommand(finalQuery, conn);
-
-            Console.WriteLine(cmd.ExecuteNonQuery());
-            Console.WriteLine("Table is created Successfully");
-
-
+            // Execute CREATE INDEX
+            foreach (var idxQuery in indexQueries)
+            {
+                using SqlCommand cmd = new SqlCommand(idxQuery, conn);
+                cmd.ExecuteNonQuery();
+                Console.WriteLine("✅ Index created: " + idxQuery);
+            }
         }
-        catch (Exception ex) {
-           
-            Console.WriteLine($"Message : {ex.Message}");
-
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error: {ex.Message}");
         }
     }
 }
