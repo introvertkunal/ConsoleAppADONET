@@ -40,7 +40,7 @@ class Program
 
         Console.WriteLine(finalQuery);
 
-        string connectionString = @$"Server=DESKTOP-87F8Q4U\MSSQLSERVER01;Database= simpleDatabase;Trusted_Connection=True;TrustServerCertificate=True";
+        string connectionString = @$"Server=;Database= simpleDatabase;Trusted_Connection=True;TrustServerCertificate=True";
 
         using SqlConnection conn = new SqlConnection(connectionString);
 

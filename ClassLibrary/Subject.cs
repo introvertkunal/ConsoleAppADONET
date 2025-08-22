@@ -1,22 +1,23 @@
 ﻿
-using System.ComponentModel.DataAnnotations.Schema;
+
+using ConsoleAppADONET;
 
 namespace ClassLibrary
 {
-    [Table("Subject")]
+    [SqlTable("Subject")]
     public class Subject 
     {
 
-        [Column("INT")]
+        [SqlColumn("INT",true,true,true,false)]
         public int Id { get; set; }
 
-        [Column("NVARCHAR(30)")]
+        [SqlColumn("NVARCHAR(30)",false,false,false,false)]
         public string Name { get; set; }
 
-        [Column("NVARCHAR(60)")]
+        [SqlColumn("NVARCHAR(60)", false, false, false, false)]
         public string Description { get; set; }
 
-        [Column("NVARCHAR(10)")]
+        [SqlColumn("NVARCHAR(10)", false, false, false, false)]
         public string Code { get; set; }
 
     }
